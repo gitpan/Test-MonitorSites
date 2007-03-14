@@ -1,0 +1,23 @@
+Build.PL
+Changes
+MANIFEST
+META.yml # Will be created by "make dist"
+Makefile.PL
+README
+lib/Test/MonitorSites.pm
+t/00.load.t
+t/10_exercise_constructor.t
+t/12_exercise_test_sites_method.t
+t/13_exercise_mail_functions.pl
+t/14_cover_conditions.t
+t/15_test_rpt_by_ip.pl
+t/perlcritic.t
+t/pod-coverage.t
+t/pod.t
+t/emailtest.ini
+t/empty_test_suite.ini
+t/incomplete_test_suite.ini
+t/testsuite_report_by_ip.ini
+t/testsuite_addtl.ini
+t/testsuite.ini
+tmp/test_sites_output_addtl
