@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 use Test::Builder::Tester;
-use Test::More tests => 13;
+use Test::More tests => 12;
 use Data::Dumper;
 use WWW::Mechanize;
 
@@ -76,6 +76,9 @@ $tester->_test_tests();
 
 my $log = $tester->_return_result_log();
 like($log,qr/tmp\/test_sites_output_addtl/,'Seems to return the correct result_log');
+
+$tester->{'config'}->param('global.report_by_ip') = undef;
+$tester->test_sites();
 
 TODO:
 {

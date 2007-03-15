@@ -77,8 +77,8 @@ like($tester->{'error'},qr/No configuration data is available./,'And an appropri
 $config_file = "$cwd/t/incomplete_test_suite.ini";
 $tester = Test::MonitorSites->new( { 'config_file' => $config_file } );
 is($tester->{'config'}->{'_FILE_NAME'},$config_file,"This object does include the incomplete configuration file.");
-is($tester->{'error'},undef,'And the empty file error is not thrown.');
-# unlike($tester->{'error'},qr/No configuration data is available./,'And the empty file error is not thrown.');
+# is($tester->{'error'},undef,'And the empty file error is not thrown.');
+unlike($tester->{'error'},qr/No configuration data is available./,'And the empty file error is not thrown.');
 like($tester->{'result_log'},qr/Test_MonitorSites_result.log/,'It gives us the default result log file');
 
 1;

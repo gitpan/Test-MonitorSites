@@ -16,7 +16,7 @@ use Mail::Mailer;
 # use Mail::Mailer qw(mail);
 
 use vars qw($VERSION);
-$VERSION = '0.04';
+$VERSION = '0.05';
 
 1; # Magic true value required at end of module
 
@@ -57,6 +57,12 @@ sub new {
           }
         } else {
           $self->{'result_log'} = "$cwd/Test_MonitorSites_result.log"; 
+        }
+        if(!defined($cfg->param('global.MonitorSites_email'))){
+          $self->{'error'} .= 'No return email address definined in configuration as global.MonitorSites_email.  ';
+          $cfg->param('global.MonitorSites_email','MonitorSites@example.net'); 
+        } else {
+          1;
         }
       }
     } else {
@@ -172,6 +178,7 @@ sub test_sites {
          'critical_failues' => $critical_failures,
        );
 
+  # print Dumper($critical_failures);
   return \%result;
 }
 
@@ -197,12 +204,16 @@ sub _analyze_test_logs {
       $param_name = 'site_' . $url;
       $ip = $self->{'config'}->{'_DATA'}->{"site_$url"}->{'ip'};
       @ip = @{$ip} if(ref($ip));
-      foreach $test (keys %critical_failures){
+      if(!defined($critical_failures{'failed_tests'}{'ip'}{"$ip[0]"}{'count'})){
+        $critical_failures{'failed_tests'}{'ip'}{"$ip[0]"}{'count'} = 0;
+      }
+      foreach my $test (keys %critical_failures){
         if($test eq 'failed_tests'){ next; }
         $test_string = $test;
         $test_string =~ s/_/ /g;
         if($_ =~ m/$test_string/){
           $critical_failures++;
+          $critical_failures{'failed_tests'}{'ip'}{"$ip[0]"}{'count'}++ if(ref($ip));
           $critical_failures{'failed_tests'}{'ip'}{"$ip[0]"}{"$url"} = $_ if(ref($ip));
           $critical_failures{'failed_tests'}{'url'}{"$url"}{"$test"} = $_;
           $critical_failures{'failed_tests'}{'test'}{"$test"}{"$url"} = $_;
@@ -227,9 +238,14 @@ sub email {
 
   my %headers = (
          'To'      => $self->{'config'}->param('global.results_recipients'),
-         'From'    => 'MonitorSites@gandhi.greens.org',
+         'From'    => $self->{'config'}->param('global.MonitorSites_email'),
          'Subject' => 'MonitorSites log',
        );
+
+  $body = "
+    This summary braught to you by 
+    Test::MonitorSites version $VERSION 
+    ===================================\n\n";
 
   my $file = $self->{'config'}->param('global.result_log');
   if($self->{'config'}->param('global.send_summary') == 1){
@@ -275,31 +291,37 @@ sub sms {
   my %critical_failures = %{$critical_failures};
   my %headers = (
          'To'      => $self->{'config'}->param('global.sms_recipients'),
-         'From'    => 'MonitorSites@gandhi.greens.org',
+         'From'    => $self->{'config'}->param('global.MonitorSites_email'),
          'Subject' => 'Critical Failures',
        );
 
   my ($type,@args,$body,$test,$url,$ip);
-  if(defined($self->{'config'}->param("global.report_by_ip"))){
-    if($self->{'config'}->param("global.report_by_ip") == 1){
-      foreach $ip (keys %{$critical_failures{'failed_tests'}{'ip'}}){
-        $body = "Failures at $ip; Sites affected include: ";
-        foreach $url (keys %{$critical_failures{'failed_tests'}{'ip'}{"$ip"}}){
-          $body .= "Not OK: $url, ";
+  my($failing_domains,$failing_domains_at_ip);
+  if(defined($self->{'config'}->param("global.report_by_ip")) 
+    && $self->{'config'}->param("global.report_by_ip") == 1){
+      foreach my $ip (keys %{$critical_failures{'failed_tests'}{'ip'}}){
+        $failing_domains = 0;
+        $failing_domains_at_ip = "";
+        foreach my $url (keys %{$critical_failures{'failed_tests'}{'ip'}{"$ip"}}){
+          if($url eq 'count'){ next; }
+          $failing_domains++;
+          $failing_domains_at_ip .= "NOK: $url, ";
         }
+        $body = "$critical_failures{'failed_tests'}{'ip'}{$ip}{'count'}";
+        $body .= " critical errors at $ip; incl $failing_domains domains: ";
+        $body .= $failing_domains_at_ip;
         # is(1,1,'About to send sms now about $url.');
         my $mailer = new Mail::Mailer $type, @args;
         $mailer->open(\%headers);
           print $mailer $body;
         $mailer->close;
       }
-    }
   } else {
     my $i = 0;
-    foreach $url (keys %{$critical_failures{'failed_tests'}{'url'}}){
+    foreach my $url (keys %{$critical_failures{'failed_tests'}{'url'}}){
       $i++; 
       $body = "Failure: $i of $critical_failures{'count'}: $url: ";
-      foreach $test (keys %{$critical_failures{'failed_tests'}{'url'}{"$url"}}){
+      foreach my $test (keys %{$critical_failures{'failed_tests'}{'url'}{"$url"}}){
         $body .= "Not OK: $test, ";
       }
       # is(1,1,'About to send sms now about $url.');
@@ -350,7 +372,7 @@ Test::MonitorSites - Monitor availability and function of a list of websites
 
 =head1 VERSION
 
-This document describes Test::MonitorSites version 0.0.4
+This document describes Test::MonitorSites version 0.0.5
 
 =head1 SYNOPSIS
 

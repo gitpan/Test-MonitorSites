@@ -1,5 +1,17 @@
 Revision history for Test-MonitorSites
 
-0.0.1  Tue Feb  6 14:58:06 2007
+0.05   Thu Mar 15 11:37:00 2007
+       ->sms() method now reports count of both 
+	critical errors and domains with such errors
+	->email() method reports module version 
+
+0.04   Mon Mar 12 12:00:00 2007
+       ->sms() method now supports report_by_ip
+	configuration variable
+
+0.03   
+       First version deployed on gpca servers
+
+0.01   Tue Feb  6 14:58:06 2007
        Initial release.
 
