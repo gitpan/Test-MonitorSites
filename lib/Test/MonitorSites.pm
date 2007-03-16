@@ -16,7 +16,7 @@ use Mail::Mailer;
 # use Mail::Mailer qw(mail);
 
 use vars qw($VERSION);
-$VERSION = '0.05';
+$VERSION = '0.06';
 
 1; # Magic true value required at end of module
 
@@ -43,6 +43,11 @@ sub new {
         }
         # print STDERR @sites, "\n";
         $self->{'sites'} = \@sites;
+        foreach my $s (@sites){
+          if(!defined($cfg->{'_DATA'}{"site_$s"}{'ip'})){
+            $cfg->{'_DATA'}{"site_$s"}{'ip'} = [ '0.0.0.0' ];
+          }
+        }
         my $cwd = getcwd();
         # {
           # no strict 'refs';
@@ -59,7 +64,7 @@ sub new {
           $self->{'result_log'} = "$cwd/Test_MonitorSites_result.log"; 
         }
         if(!defined($cfg->param('global.MonitorSites_email'))){
-          $self->{'error'} .= 'No return email address definined in configuration as global.MonitorSites_email.  ';
+          $self->{'error'} .= "Configuration fails to define global.MonitorSites_email for From: line.\n";
           $cfg->param('global.MonitorSites_email','MonitorSites@example.net'); 
         } else {
           1;
@@ -134,17 +139,21 @@ sub test_sites {
       @expected = @{$expected};
       # $self->_test_tests();
       $self->_test_site($agent,$url[0],$expected[0]);
-      @test_links = @{$sites{"site_$site"}{'test_links'}};
-      if ($test_links[0] == 1) {
-        $self->_test_links($mech,$url[0]) 
-      } else {
-        diag("Skipping tests of links at: $site.");
+      if(defined($sites{"site_$site"}{'test_links'})){
+        @test_links = @{$sites{"site_$site"}{'test_links'}};
+        if ($test_links[0] == 1) {
+          $self->_test_links($mech,$url[0]) 
+        } else {
+          diag("Skipping tests of links at: $site.");
+        }
       }
-      @test_valid_html = @{$sites{"site_$site"}{'test_valid_html'}};
-      if ($test_valid_html[0] == 1) {
-        $self->_test_valid_html($mech,$url[0]) 
-      } else {
-        diag("Skipping tests of html validity at: $site.");
+      if(defined($sites{"site_$site"}{'test_valid_html'})){
+        @test_valid_html = @{$sites{"site_$site"}{'test_valid_html'}};
+        if ($test_valid_html[0] == 1) {
+          $self->_test_valid_html($mech,$url[0]) 
+        } else {
+          diag("Skipping tests of html validity at: $site.");
+        }
       }
   
     }
@@ -155,15 +164,15 @@ sub test_sites {
 
   my $critical_failures = $self->_analyze_test_logs();  
   if($critical_failures->{'count'} > 0){
-    print STDERR "Next we send an sms message.\n";
+    # print STDERR "Next we send an sms message.\n";
     $self->sms($critical_failures);
   } else {
     $self->{'error'} .= "We won't send an sms, there were no critical_failures.\n";
-    print STDERR "We won't send an sms, there were no critical_failures.\n";
+    # print STDERR "We won't send an sms, there were no critical_failures.\n";
   }
 
   if(defined($self->{'config'}->param('global.results_recipients'))){
-    print STDERR "Next we send some email.\n";
+    # print STDERR "Next we send some email.\n";
     $self->email();
   } else {
     $self->{'error'} .= "We won't send an email, there was no result_recipient defined in the configuration file.\n";
@@ -187,7 +196,7 @@ sub _analyze_test_logs {
   my $critical_failures = 0;
   my %critical_failures;
   foreach my $test ('linked_to','expected_content','all_links','valid'){
-    print STDERR "This \$test is $test.\n";
+    # print STDERR "This \$test is $test.\n";
     if($self->{'config'}->param("critical_failure.$test") == 1){
       $critical_failures{"$test"} = 1;
     }
@@ -202,8 +211,20 @@ sub _analyze_test_logs {
       $url =~ s/\/.*$//;
       $url =~ s/\.$//;
       $param_name = 'site_' . $url;
-      $ip = $self->{'config'}->{'_DATA'}->{"site_$url"}->{'ip'};
-      @ip = @{$ip} if(ref($ip));
+      if(defined(@{$self->{'config'}->{'_DATA'}->{"$param_name"}->{'ip'}}[0])){
+        @ip = @{$self->{'config'}->{'_DATA'}->{"$param_name"}->{'ip'}};
+        # @ip = @{$ip} if(ref($ip));
+      } else {
+        $self->{'error'} .= "IP address not defined for $url.\n";
+        # print Dumper(\$self->{'config'}->{'_DATA'}->{"$param_name"});
+        print 'ip array is: ' . Dumper(\$self->{'config'}->{'_DATA'}->{"$param_name"}->{'ip'});
+        print 'ip: ' . @{$self->{'config'}->{'_DATA'}->{"$param_name"}->{'ip'}}[0] . "\n";
+        print 'ip: ' . @{$self->{'config'}->{'_DATA'}->{"$param_name"}->{'ip'}}[0] . "\n";
+        print Dumper(\$self->{'error'});
+        print "Site key is: $param_name.\n";
+        print "Now exiting.\n";
+        exit;
+      }
       if(!defined($critical_failures{'failed_tests'}{'ip'}{"$ip[0]"}{'count'})){
         $critical_failures{'failed_tests'}{'ip'}{"$ip[0]"}{'count'} = 0;
       }
@@ -315,6 +336,7 @@ sub sms {
         $mailer->open(\%headers);
           print $mailer $body;
         $mailer->close;
+        $self->_log_sms($body);
       }
   } else {
     my $i = 0;
@@ -329,10 +351,34 @@ sub sms {
       $mailer->open(\%headers);
         print $mailer $body;
       $mailer->close;
+      $self->_log_sms($body);
     }
   }
 
   return 1;
+}
+
+sub _log_sms {
+  my $self = shift;
+  my $body = shift;
+
+  my $header = "To: " . $self->{'config'}->param('global.sms_recipients') . "\n";
+  $header .= "From: " . $self->{'config'}->param('global.MonitorSites_email') . "\n";
+  $header .= "Subject:Critical Failures\n";
+  my $log_msg = $header . $body;
+
+  my @sms_log;
+  if(defined($self->{'sms_log'})){
+    @sms_log = @{$self->{'sms_log'}};
+  } else {
+    @sms_log = ();
+  }
+
+  push @sms_log, $log_msg;
+  $self->{'sms_log'} = \@sms_log;
+  my $count = @sms_log;
+
+  return $count;
 }
 
 sub _test_tests {
@@ -372,7 +418,7 @@ Test::MonitorSites - Monitor availability and function of a list of websites
 
 =head1 VERSION
 
-This document describes Test::MonitorSites version 0.0.5
+This document describes Test::MonitorSites version 0.06
 
 =head1 SYNOPSIS
 

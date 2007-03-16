@@ -1,5 +1,9 @@
 Revision history for Test-MonitorSites
 
+0.06   Fri Mar 16 00:45:00 2007
+       tightened up test suite so it begins to 
+	cover, reasonably well, the new features.
+
 0.05   Thu Mar 15 11:37:00 2007
        ->sms() method now reports count of both 
 	critical errors and domains with such errors

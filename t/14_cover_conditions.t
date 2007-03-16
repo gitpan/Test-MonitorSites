@@ -16,6 +16,12 @@ my $config_file = "$cwd/t/testsuite_addtl.ini";
 # diag("     " . $config_file);
 my $tester = Test::MonitorSites->new( { 'config_file' => $config_file } );
 
+# END:
+# {
+  # print STDERR Dumper(\$tester);
+  # print "That's it folks!\n"
+# }
+
 test_out("ok 1 - Successfully linked to http://www.perlmonks.com.",
    "ok 2 -  . . . and found expected content at http://www.perlmonks.com");
 
@@ -72,22 +78,33 @@ like($tester->{'error'},qr/Configuration file disabled email dispatch of results
 like($tester->{'error'},qr/Configuration file disabled email dispatch of diagnostic log./,'Configuration file set send_diagnostics = 0, so diagnostics not  sent');
 # like($tester->{'error'},qr//,'');
 
+test_out("ok 1 - Twelve is twelve.",
+         "not ok 2 - Twelve is thirteen.");
 $tester->_test_tests();
+test_test( name => 'Basic tests seem to work.',
+           skip_err => 1 );
 
 my $log = $tester->_return_result_log();
 like($log,qr/tmp\/test_sites_output_addtl/,'Seems to return the correct result_log');
 
-$tester->{'config'}->param('global.report_by_ip') = undef;
-$tester->test_sites();
+TODO:
+{
+  local $TODO = "On the bleeding edge of development . . . ";
+  $tester->{'error'} = undef;
+  $tester->{'config'}->delete('global.results_recipients');
+  
+  test_out('');
+  $tester->test_sites();
+  
+  test_test( name => "Test suite run without results_recipient defined.",
+         skip_err => 1 );
+  
+  like($tester->{'error'},qr/no result_recipient defined/,'No result_recipient defined, so no email will be sent.');
+}
 
 TODO:
 {
-  local $TODO = "Looking for an elegant way to test this, that works.";
-  # $tester->{'error'} = undef;
-  # $tester->{'config'}->param('global.results_recipients') = undef;
-  # $tester->test_sites();
-
-  like($tester->{'error'},qr/no result_recipient defined/,'No result_recipient defined, so no email will be sent.');
+  local $TODO = "On the bleeding edge of development . . . ";
 }
 
 1;
