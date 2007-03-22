@@ -2,6 +2,14 @@ use strict;
 use warnings;
 use ExtUtils::MakeMaker;
 
+# print "==>  These tests generate email output                            <==\n";
+# print "==>  Where would you like your test results sent?                 <==\n";
+# print "==>  By default test email summaries go to dev-null\@example.com  <==\n";
+# print "==>  By default test sms summaries go to dev-null\@example.com    <==\n";
+
+# my $answer = prompt('Send test email summaries to?','devnull@example.com');
+# my $answer = prompt('Send test sms summaries to?','devnull@example.com');
+
 WriteMakefile(
     NAME                => 'Test::MonitorSites',
     AUTHOR              => 'Hugh Esco <hesco@greens.org>',
@@ -27,3 +35,5 @@ WriteMakefile(
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean               => { FILES => 'Test-MonitorSites-*' },
 );
+
+

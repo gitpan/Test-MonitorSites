@@ -16,7 +16,7 @@ use Mail::Mailer;
 # use Mail::Mailer qw(mail);
 
 use vars qw($VERSION);
-$VERSION = '0.06';
+$VERSION = '0.07';
 
 1; # Magic true value required at end of module
 
@@ -69,6 +69,19 @@ sub new {
         } else {
           1;
         }
+        foreach my $i ('ips', 'critical_errors', 'servers_with_failures', 'tests', 'sites') {
+          $self->{'result'}->{$i} = 0;
+        }
+        if(!defined($cfg->param('global.report_success')) 
+            || $cfg->param('global.report_success') != 1){
+          $cfg->param('global.report_success',0);
+        }
+        if(!defined($cfg->param('global.MonitorSites_subject'))) {
+          $cfg->param('global.MonitorSites_subject','Critical Failures');
+        }
+        if(!defined($cfg->param('global.MonitorSites_all_ok_subject'))) {
+          $cfg->param('global.MonitorSites_all_ok_subject','Servers All OK');
+        }
       }
     } else {
       $self->{'config_file'} = undef;
@@ -105,7 +118,7 @@ sub test_sites {
     $self->{'error'} .= 'No sites have been identified for testing.  Please add sites to: ' . $self->{'config_file'};
   }
 
-  my ($key, $url, $expected_content,$expected);
+  my ($key, $url, $expected_content,$expected,$ip);
   my(@url,@expected,@sites,@test_links,@test_valid_html);
   my $agent = $self->{'agent'};
   my $mech = $self->{'mech'};
@@ -129,20 +142,31 @@ sub test_sites {
     # print STDERR Dumper(\%sites);
     foreach my $site (keys %sites){
       if($site !~ m/^site_/){ next; }
+      # diag("The site is $site");
       $site =~ s/^site_//;
+      # diag("The site is $site");
       push @sites, $site;
+      $self->{'result'}->{'sites'}++;
+      $ip = $self->{'config'}->{'_DATA'}->{"site_$site"}->{'ip'};
+      if (defined($ip) && !defined($self->{'result'}->{'ips_tested'}->{$ip})){
+        $self->{'result'}->{'ips_tested'}->{$ip} = 1;
+        $self->{'result'}->{'ips'}++;
+      }
       # diag("The site is $site");
       # diag("The hash key is site_$site");
       $url = $self->{'config'}->{'_DATA'}->{"site_$site"}->{'url'};
       $expected = $self->{'config'}->{'_DATA'}->{"site_$site"}->{'expected_content'};
+      # diag("The url is $url.");
       @url = @{$url};
       @expected = @{$expected};
       # $self->_test_tests();
       $self->_test_site($agent,$url[0],$expected[0]);
+      $self->{'result'}->{'tests'} = $self->{'result'}->{'tests'} + 2;
       if(defined($sites{"site_$site"}{'test_links'})){
         @test_links = @{$sites{"site_$site"}{'test_links'}};
         if ($test_links[0] == 1) {
-          $self->_test_links($mech,$url[0]) 
+          $self->_test_links($mech,$url[0]);
+          $self->{'result'}->{'tests'} = $self->{'result'}->{'tests'} + 1;
         } else {
           diag("Skipping tests of links at: $site.");
         }
@@ -150,7 +174,8 @@ sub test_sites {
       if(defined($sites{"site_$site"}{'test_valid_html'})){
         @test_valid_html = @{$sites{"site_$site"}{'test_valid_html'}};
         if ($test_valid_html[0] == 1) {
-          $self->_test_valid_html($mech,$url[0]) 
+          $self->_test_valid_html($mech,$url[0]);
+          $self->{'result'}->{'tests'} = $self->{'result'}->{'tests'} + 1;
         } else {
           diag("Skipping tests of html validity at: $site.");
         }
@@ -163,12 +188,15 @@ sub test_sites {
   $Test->output(*STDOUT);
 
   my $critical_failures = $self->_analyze_test_logs();  
-  if($critical_failures->{'count'} > 0){
+  # print STDERR "Count of critical failures: $critical_failures->{'count'}\n";
+  # print "global.report_success is " . $self->{'config'}->param('global.report_success');
+  if($critical_failures->{'count'} != 0){
     # print STDERR "Next we send an sms message.\n";
     $self->sms($critical_failures);
+  } elsif ($self->{'config'}->param('global.report_success') == 1) {
+    $self->sms($critical_failures);
   } else {
-    $self->{'error'} .= "We won't send an sms, there were no critical_failures.\n";
-    # print STDERR "We won't send an sms, there were no critical_failures.\n";
+    $self->{'error'} .= "We won't send an sms, there were no critical_failures and global.report_success is not set true.\n";
   }
 
   if(defined($self->{'config'}->param('global.results_recipients'))){
@@ -179,12 +207,13 @@ sub test_sites {
   }
 
   my %result = (
-         'sites' => $self->{'sites'},
-         'planned' => '',
-         'run' => '',
-         'passed' => '',
-         'failed' => '',
-         'critical_failues' => $critical_failures,
+           'ips'     => $self->{'result'}->{'ips'},
+           'sites'   => $self->{'sites'},
+           'planned' => '',
+           'run'     => $self->{'result'}->{'tests'},
+           'passed'  => '',
+           'failed'  => '',
+  'critical_failues' => $critical_failures,
        );
 
   # print Dumper($critical_failures);
@@ -195,6 +224,7 @@ sub _analyze_test_logs {
   my $self = shift;
   my $critical_failures = 0;
   my %critical_failures;
+  $critical_failures{'count'} = 0;
   foreach my $test ('linked_to','expected_content','all_links','valid'){
     # print STDERR "This \$test is $test.\n";
     if($self->{'config'}->param("critical_failure.$test") == 1){
@@ -244,6 +274,9 @@ sub _analyze_test_logs {
   }
   close('SUMMARY');  
   $critical_failures{'count'} = $critical_failures;
+  if($critical_failures{'count'} == 0){
+    # print STDERR "The count of critical failures is 0.\n";
+  }
 
   return \%critical_failures;
 }
@@ -264,9 +297,17 @@ sub email {
        );
 
   $body = "
-    This summary braught to you by 
+    This summary brought to you by 
     Test::MonitorSites version $VERSION 
-    ===================================\n\n";
+    ===================================\n";
+
+    $body .= '    Tests: ' . $self->{'result'}->{'tests'};
+    $body .= ', IPs: ' . $self->{'result'}->{'ips'};
+    $body .= ', Sites: ' . $self->{'result'}->{'sites'};
+    $body .= ', CFs: ' . $self->{'result'}->{'critical_errors'};
+    $body .= "\n    ===================================\n\n";
+    
+    # $self->{'result'}->{'message'} = $body;
 
   my $file = $self->{'config'}->param('global.result_log');
   if($self->{'config'}->param('global.send_summary') == 1){
@@ -313,12 +354,29 @@ sub sms {
   my %headers = (
          'To'      => $self->{'config'}->param('global.sms_recipients'),
          'From'    => $self->{'config'}->param('global.MonitorSites_email'),
-         'Subject' => 'Critical Failures',
+         'Subject' => $self->{'config'}->param('global.MonitorSites_subject'),
        );
 
-  my ($type,@args,$body,$test,$url,$ip);
+  my ($mailer,$type,@args,$body,$test,$url,$ip);
   my($failing_domains,$failing_domains_at_ip);
-  if(defined($self->{'config'}->param("global.report_by_ip")) 
+  if($critical_failures->{'count'} == 0){
+    $headers{'Subject'} = $self->{'config'}->param('global.MonitorSites_all_ok_subject');
+
+    $body = '';
+    $body .= 'Tests: ' . $self->{'result'}->{'tests'};
+    $body .= ', IPs: ' . $self->{'result'}->{'ips'};
+    $body .= ', Sites: ' . $self->{'result'}->{'sites'};
+    $body .= ', CFs: ' . $self->{'result'}->{'critical_errors'};
+    $body .= '; No critical errors found.';
+    $self->{'result'}->{'message'} = $body;
+
+    $mailer = new Mail::Mailer $type, @args;
+    $mailer->open(\%headers);
+      print $mailer $body;
+    $mailer->close;
+    $self->_log_sms($body);
+
+  } elsif(defined($self->{'config'}->param("global.report_by_ip")) 
     && $self->{'config'}->param("global.report_by_ip") == 1){
       foreach my $ip (keys %{$critical_failures{'failed_tests'}{'ip'}}){
         $failing_domains = 0;
@@ -332,7 +390,7 @@ sub sms {
         $body .= " critical errors at $ip; incl $failing_domains domains: ";
         $body .= $failing_domains_at_ip;
         # is(1,1,'About to send sms now about $url.');
-        my $mailer = new Mail::Mailer $type, @args;
+        $mailer = new Mail::Mailer $type, @args;
         $mailer->open(\%headers);
           print $mailer $body;
         $mailer->close;
@@ -347,7 +405,7 @@ sub sms {
         $body .= "Not OK: $test, ";
       }
       # is(1,1,'About to send sms now about $url.');
-      my $mailer = new Mail::Mailer $type, @args;
+      $mailer = new Mail::Mailer $type, @args;
       $mailer->open(\%headers);
         print $mailer $body;
       $mailer->close;
@@ -418,7 +476,7 @@ Test::MonitorSites - Monitor availability and function of a list of websites
 
 =head1 VERSION
 
-This document describes Test::MonitorSites version 0.06
+This document describes Test::MonitorSites version 0.07
 
 =head1 SYNOPSIS
 
@@ -433,11 +491,42 @@ This document describes Test::MonitorSites version 0.06
         $tester->sms($results->{'critical_failures'});
     }
 
+A complete list of supported base configuration options includes
+the following listed in the global and critical_failure
+stanza's.  Tests turned on in the critical_failure stanza
+determine which tests are sufficiently critical to warrant an
+sms message to a cell phone.  All tests enabled are run and
+reported in the email summary report.
+
+=over 4
+
+    [global]
+    sms_recipients = '7705552398@txt.example.net'
+    results_recipients = 'admin@example.com'
+    MonitorSites_subject = 'Critical Failures'
+    MonitorSites_all_ok_subject = 'Servers A-OK'
+    result_log = '/tmp/test_sites_output'
+    send_summary = 1
+    send_diagnostics = 1
+    report_by_ip = 1
+    report_success = 1
+    test_links = 0
+    test_valid_html = 0
+    
+    [critical_failure]
+    linked_to = 1
+    expected_content = 1
+    all_links = 0
+    valid = 0
+
+=back
+
 In addition to any global variables which may apply to an
 entire test suite, the configuration file ought to include an
 ini formatted section for each website the test suite defined
 by the configuration file ought to test or exercise.  For full
 details on the permitted format, read perldoc Config::Simple.
+
 In this first example, we'll test the cpan.org site for accessible html
 markup and to ensure that the links all work.  With the perlmonks site,
 we'll simply confirm that the site resolves and that its expected
@@ -594,6 +683,13 @@ None reported.
 =head1 BUGS AND LIMITATIONS
 
 No bugs have been reported.
+
+I am seeing failed tests in t/14_cover_conditions.t.  
+I believe the errors are in the test code, though, 
+and not in the module itself.  Still working on this.
+
+Should you see failures in t/14_ tests, but the rest of the
+suite is running fine, you need not fear a force install.
 
 I welcome bug reports and feature requests at both:
 <http://www.campaignfoundations.com/project/issues>

@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 use Test::Builder::Tester;
-use Test::More tests => 12;
+use Test::More tests => 14;
 use Data::Dumper;
 use WWW::Mechanize;
 
@@ -12,9 +12,9 @@ use Test::MonitorSites;
 my $cwd = `pwd`;
 chomp($cwd);
 my $config_file = "$cwd/t/testsuite_addtl.ini";
+my $tester = Test::MonitorSites->new( { 'config_file' => $config_file } );
 # diag('We\'re using as our config file: ');
 # diag("     " . $config_file);
-my $tester = Test::MonitorSites->new( { 'config_file' => $config_file } );
 
 # END:
 # {
@@ -101,6 +101,37 @@ TODO:
   
   like($tester->{'error'},qr/no result_recipient defined/,'No result_recipient defined, so no email will be sent.');
 }
+
+# diag("Pierre requested report on all success.");
+$config_file = "$cwd/t/testsuite_all_ok.ini";
+$tester = Test::MonitorSites->new( { 'config_file' => $config_file } );
+  
+test_out("ok 1 - Successfully linked to http://www.perlmonks.com.",
+  "ok 2 -  . . . and found expected content at http://www.perlmonks.com",
+  "ok 3 - Successfully linked to http://validator.w3.org/.",
+  "ok 4 -  . . . and found expected content at http://validator.w3.org/",
+  "ok 5 - Successfully linked to http://www.cpan.org.",
+  "ok 6 -  . . . and found expected content at http://www.cpan.org",
+  "ok 7 - Successfully linked to http://www.campaignfoundations.com.",
+  "ok 8 -  . . . and found expected content at http://www.campaignfoundations.com");
+
+  $tester->test_sites();
+  
+TODO:
+{
+  local $TODO = "On the bleeding edge, no critical error report.";
+  test_test( name => "Test suite ran without any critical errors", 
+        skip_err => 1 );
+}
+
+# exit;
+  
+is($tester->{'result'}->{'critical_errors'},0,'No critical errors found.');
+is($tester->{'result'}->{'servers_with_failures'},0,'No servers had errors.');
+is($tester->{'result'}->{'tests'},8,'Eight tests were run.');
+is($tester->{'result'}->{'sites'},4,'Four sites were tested.');
+is($tester->{'result'}->{'ips'},4,'Sites on four IPs were tested.');
+is($tester->{'result'}->{'message'},'Tests: 8, IPs: 4, Sites: 4, CFs: 0; No critical errors found.','Tests: 8, IPs: 4, Sites: 4, CFs: 0; No critical errors found.');
 
 TODO:
 {
