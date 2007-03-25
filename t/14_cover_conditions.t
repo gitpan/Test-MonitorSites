@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 use Test::Builder::Tester;
-use Test::More tests => 19;
+use Test::More tests => 17;
 use Data::Dumper;
 use WWW::Mechanize;
 
@@ -74,8 +74,8 @@ while(<TESTS>){
 close('TESTS');
 
 like($tester->{'error'},qr/there were no critical_failures/,'All tests passed, no text message sent');
-like($tester->{'error'},qr/Configuration file disabled email dispatch of results log./,'Configuration file set send_summary = 0, no email sent');
-like($tester->{'error'},qr/Configuration file disabled email dispatch of diagnostic log./,'Configuration file set send_diagnostics = 0, so diagnostics not  sent');
+# like($tester->{'error'},qr/Configuration file disabled email dispatch of results log./,'Configuration file set send_summary = 0, no summary sent');
+# like($tester->{'error'},qr/Configuration file disabled email dispatch of diagnostic log./,'Configuration file set send_diagnostics = 0, so diagnostics not  sent');
 # like($tester->{'error'},qr//,'');
 
 test_out("ok 1 - Twelve is twelve.",
@@ -87,19 +87,20 @@ test_test( name => 'Basic tests seem to work.',
 my $log = $tester->_return_result_log();
 like($log,qr/tmp\/test_sites_output_addtl/,'Seems to return the correct result_log');
 
+$tester->{'error'} = undef;
+$tester->{'config'}->delete('global.results_recipients');
+  
+test_out('');
+$tester->test_sites();
+  
+test_test( name => "Test suite run without results_recipient defined.",
+         skip_out => 1 );
+  
+like($tester->{'error'},qr/no results_recipient defined/,'No results_recipient defined, so no email will be sent.');
+
 TODO:
 {
   local $TODO = "On the bleeding edge of development . . . ";
-  $tester->{'error'} = undef;
-  $tester->{'config'}->delete('global.results_recipients');
-  
-  test_out('');
-  $tester->test_sites();
-  
-  test_test( name => "Test suite run without results_recipient defined.",
-         skip_err => 1 );
-  
-  like($tester->{'error'},qr/no result_recipient defined/,'No result_recipient defined, so no email will be sent.');
 }
 
 # diag("Pierre requested report on all success.");
@@ -115,13 +116,14 @@ test_out("ok 1 - Successfully linked to http://www.perlmonks.com.",
   "ok 7 - Successfully linked to http://www.campaignfoundations.com.",
   "ok 8 -  . . . and found expected content at http://www.campaignfoundations.com");
 
-  $tester->test_sites();
+$tester->test_sites();
   
+test_test( name => "Test suite ran without any critical errors", 
+        skip_out => 1 );
+
 TODO:
 {
   local $TODO = "On the bleeding edge, no critical error report.";
-  test_test( name => "Test suite ran without any critical errors", 
-        skip_err => 1 );
 }
 
 # exit;

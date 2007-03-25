@@ -1,5 +1,11 @@
 Revision history for Test-MonitorSites
 
+0.10   Sun Mar 25 13:32:07 2007
+       adds t/16_monitor_quietly.t, exercising 
+	new conditionals around use of ->email()
+	to permit quiet periodic monitoring, 
+	except when faced with critical failures.
+
 0.09   Sat Mar 24 17:50:25 2007
        tighten up test suite to better cover 
 	and test new code.  

@@ -16,7 +16,7 @@ use Mail::Mailer;
 # use Mail::Mailer qw(mail);
 
 use vars qw($VERSION);
-$VERSION = '0.09';
+$VERSION = '0.10';
 
 1; # Magic true value required at end of module
 
@@ -202,10 +202,15 @@ sub test_sites {
   }
 
   if(defined($self->{'config'}->param('global.results_recipients'))){
-    # print STDERR "Next we send some email.\n";
-    $self->email($critical_failures);
+    if($self->{'config'}->param('global.send_summary') 
+        || $self->{'config'}->param('global.send_diagnostics')){
+      # print STDERR "Next we send some email.\n";
+      $self->email($critical_failures);
+    } else {
+      $self->{'error'} .= "We won't send an email, neither send_summary nor send_diagnostics were set to true in the configuration file.\n";
+    }
   } else {
-    $self->{'error'} .= "We won't send an email, there was no result_recipient defined in the configuration file.\n";
+    $self->{'error'} .= "We won't send an email, there was no results_recipient defined in the configuration file.\n";
   }
 
   my %result = (
@@ -326,7 +331,8 @@ sub email {
     $self->{'error'} .= "Configuration file disabled email dispatch of results log.\n";
   }
 
-  if($self->{'config'}->param('global.send_diagnostics') == 1){
+  if(defined($self->{'config'}->param('global.send_diagnostics'))
+      && $self->{'config'}->param('global.send_diagnostics') == 1){
     $body .= <<'End_of_Separator';
 
      ==============================================
@@ -486,7 +492,7 @@ Test::MonitorSites - Monitor availability and function of a list of websites
 
 =head1 VERSION
 
-This document describes Test::MonitorSites version 0.09
+This document describes Test::MonitorSites version 0.10
 
 =head1 SYNOPSIS
 
@@ -496,7 +502,19 @@ This document describes Test::MonitorSites version 0.09
          });
 
     my $results = $tester->test_sites();
+    print $tester->{'errors'};
+
+    |--- now go check your email and sms pager.
+
+    The ->test_sites() method will invoke the ->email() and ->sms() 
+    methods as appropriate given the settings in the configuration file
+    used in the constructor.  However, these methods are documented as
+    public, and if it serves your needs to use them directly, feel free.  
+
+    $tester->{'config'}->param('global.results_recipients','metoo@example.com');
     $tester->email($results);
+
+    $tester->{'config'}->param('global.sms_recipients','12345559823@txt.example.com');
     if(defined($results->{'critical_failures'})){
         $tester->sms($results->{'critical_failures'});
     }
@@ -531,11 +549,28 @@ reported in the email summary report.
 
 =back
 
+To run this module in quiet mode, set the following to '0'
+or leave undefined in the configuration: report_success,
+send_summary, send_diagnostics.  If configured this way,
+sms messages will be sent to report critical failures, but no
+email summary reports will be sent.
+
+It is possible to test the same set of sites hourly in quiet
+mode, and then using the $tester->{'config'}->param() method
+(documented as the ->param() method in perldoc Config::Simple),
+or an alternate ini file to run a sinle test each day with
+report_success set to '1', to get a daily reminder that the
+server from which these tests are run is itself up and running
+and that this module is still working as expected.
+
 In addition to any global variables which may apply to an
 entire test suite, the configuration file ought to include an
 ini formatted section for each website the test suite defined
 by the configuration file ought to test or exercise.  For full
 details on the permitted format, read perldoc Config::Simple.
+
+For a full set of examples, take a look at the .t and .ini
+files in the t/ directory.
 
 In this first example, we'll test the cpan.org site for accessible html
 markup and to ensure that the links all work.  With the perlmonks site,
@@ -563,6 +598,10 @@ the site definitions could take on the following structure,
 imagining the ability to test the functionality of a specific
 web application, and powered by an application specific module
 of the form Test::MonitorSites::MyWebApplication.
+
+Anyone interested in this functionality is urged to jump right
+in and help deliver it, or to contact the author about funding
+for this further development.
 
 =over 4
 
@@ -604,7 +643,8 @@ configuration file.
 This method will permit a battery of tests to be run on each
 site defined in the configurations file.  It returns a hash
 of results, which can then be examined and tested, or used to
-make reports.
+make reports.  $tester->{'errors'} can provide useful feedback
+on show stopping errors encountered.
 
 =head2 $tester->email($results);
 
@@ -612,8 +652,9 @@ or
 
 =head2 $tester->email($results,$recipients);
 
-This method will email a report of test results to a recipients
-defined either in the configuration file or in the method call.
+This method will email a report of test results to the
+recipients defined either in the configuration file or in the
+method call.
 
 =head2 $tester->sms($results->{'critical_failures'});
 
@@ -621,14 +662,15 @@ or
 
 =head2 $tester->sms($results->{'critical_failures'},$recipients);
 
-This method will permit a notice of Critical Failures to be
-delivered by SMS messaging to a cell phone or pager device.  The
-message is delivered to recipients defined in the configuration
-file or in the method call.  If the global.report_by_ip
-configuration parameter is assigned to '1', then a single
-sms message per IP address with test failures will be sent.
-Otherwise, an sms message will be sent for each individual
-test failure, even for multiple failures on a single server.
+This method will permit a notice of Critical Failures to
+be delivered by SMS messaging to a cell phone or pager
+device.  The message is delivered to recipients defined
+in the configuration file or in the method call.  If the
+global.report_by_ip configuration parameter is assigned to '1',
+then a single sms message per IP address with test failures
+will be sent.  Otherwise, an sms message will be sent for
+each individual test failure, even for multiple failures on
+a single server or domain.
 
 =for author to fill in:
     Write a full description of the module and its features here.
@@ -669,6 +711,53 @@ without a configuration file defined in the call.
 An otherwise valid configuration file has been found, but it
 does not seem to have defined any sites to be tested.
 
+=item C<< Configuration fails to define global.MonitorSites_email >> 
+
+Because your configuration file fails to define an email address
+to be used in the From: line of email generated by this module,
+the default From: line will be used instead.
+
+=item C<< We won't send an sms, there were no critical_failures and global.report_success is not set true. >>
+
+Although this is reported to the 'error' log, it is not an
+error, so much as a report that the tests ran successfully
+and a reminder that to see a report of such success, the
+configuration option report_success can be set to '1'.
+
+=item C<<We won't send an email, neither send_summary nor send_diagnostics were set to true in the configuration file >>
+
+This error is thrown when the configuration is set to not send
+email.  It serves primarily as a reminder of the configuration
+settings available to control the quiet mode of operation.
+
+=item C<< We won't send an email, there was no results_recipient defined in the configuration file. >>
+
+This is an error.  If you are going to run these tests,
+someone ought to get an occassional report of the results.
+Add your email address to the configuration file.
+
+=item C<< IP address not defined for $url. >>
+
+This is a fatal error thrown by a private method used to analyze
+the test logs for results.  After throwing this error, the
+module will die.  The IP should be set by the constructor to
+a default '0.0.0.0' for any site defined in the configuration
+files without its own IP address.  This error message was
+added to indicate when the constructor's failure to properly
+set this default was about to crash the analysis method.
+
+=item C<< Configuration file disabled email dispatch of results log. >>
+
+Instead of adding the results log to the email report,
+the module throws this warning to the error log when the
+send_summary is set to false in the configuration file.
+
+=item C<< Configuration file disabled email dispatch of diagnostic log. >>
+
+Instead of adding the diagnostics log to the email report,
+the module throws this warning to the error log when the
+send_diagnostics is set to false in the configuration file.
+
 =back
 
 
@@ -693,13 +782,6 @@ None reported.
 =head1 BUGS AND LIMITATIONS
 
 No bugs have been reported.
-
-I am seeing failed tests in t/14_cover_conditions.t.  
-I believe the errors are in the test code, though, 
-and not in the module itself.  Still working on this.
-
-Should you see failures in t/14_ tests, but the rest of the
-suite is running fine, you need not fear a force install.
 
 I welcome bug reports and feature requests at both:
 <http://www.campaignfoundations.com/project/issues>
