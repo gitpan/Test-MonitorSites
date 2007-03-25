@@ -1,5 +1,14 @@
 Revision history for Test-MonitorSites
 
+0.09   Sat Mar 24 17:50:25 2007
+       tighten up test suite to better cover 
+	and test new code.  
+
+0.08   Sat Mar 24 01:24:05 2007
+       bug busting, no longer bombs out with an 
+	https:// url, restored working statistics, 
+	added report_success code to ->sms()
+
 0.07   Wed Mar 21 14:06:26 2007
        added logic to support report_success 
 	variable added to configuration

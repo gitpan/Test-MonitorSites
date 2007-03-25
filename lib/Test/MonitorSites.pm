@@ -16,7 +16,7 @@ use Mail::Mailer;
 # use Mail::Mailer qw(mail);
 
 use vars qw($VERSION);
-$VERSION = '0.07';
+$VERSION = '0.09';
 
 1; # Magic true value required at end of module
 
@@ -44,6 +44,7 @@ sub new {
         # print STDERR @sites, "\n";
         $self->{'sites'} = \@sites;
         foreach my $s (@sites){
+          # if($s =~ m/not ok/) { print "Found Error; \$s is $s\n"; exit; }
           if(!defined($cfg->{'_DATA'}{"site_$s"}{'ip'})){
             $cfg->{'_DATA'}{"site_$s"}{'ip'} = [ '0.0.0.0' ];
           }
@@ -144,10 +145,11 @@ sub test_sites {
       if($site !~ m/^site_/){ next; }
       # diag("The site is $site");
       $site =~ s/^site_//;
+      # if($site =~ m/not ok/) { print "Found Error; \$site is $site\n"; exit; }
       # diag("The site is $site");
       push @sites, $site;
       $self->{'result'}->{'sites'}++;
-      $ip = $self->{'config'}->{'_DATA'}->{"site_$site"}->{'ip'};
+      $ip = @{$self->{'config'}->{'_DATA'}->{"site_$site"}->{'ip'}}[0];
       if (defined($ip) && !defined($self->{'result'}->{'ips_tested'}->{$ip})){
         $self->{'result'}->{'ips_tested'}->{$ip} = 1;
         $self->{'result'}->{'ips'}++;
@@ -201,7 +203,7 @@ sub test_sites {
 
   if(defined($self->{'config'}->param('global.results_recipients'))){
     # print STDERR "Next we send some email.\n";
-    $self->email();
+    $self->email($critical_failures);
   } else {
     $self->{'error'} .= "We won't send an email, there was no result_recipient defined in the configuration file.\n";
   }
@@ -212,8 +214,8 @@ sub test_sites {
            'planned' => '',
            'run'     => $self->{'result'}->{'tests'},
            'passed'  => '',
-           'failed'  => '',
-  'critical_failues' => $critical_failures,
+           'failed'  => $critical_failures->{'count'},
+ 'critical_failures' => $critical_failures,
        );
 
   # print Dumper($critical_failures);
@@ -237,20 +239,21 @@ sub _analyze_test_logs {
     if(m/^not ok/){
       $url = $_;
       chomp($url);
-      $url =~ s/^.*http:\/\///;
+      $url =~ s/^.*https?:\/\///;
       $url =~ s/\/.*$//;
       $url =~ s/\.$//;
+      if($url =~ m/not ok/) { print "Found parsing error; \$url is $url\n"; exit; }
       $param_name = 'site_' . $url;
       if(defined(@{$self->{'config'}->{'_DATA'}->{"$param_name"}->{'ip'}}[0])){
         @ip = @{$self->{'config'}->{'_DATA'}->{"$param_name"}->{'ip'}};
         # @ip = @{$ip} if(ref($ip));
       } else {
         $self->{'error'} .= "IP address not defined for $url.\n";
-        # print Dumper(\$self->{'config'}->{'_DATA'}->{"$param_name"});
         print 'ip array is: ' . Dumper(\$self->{'config'}->{'_DATA'}->{"$param_name"}->{'ip'});
         print 'ip: ' . @{$self->{'config'}->{'_DATA'}->{"$param_name"}->{'ip'}}[0] . "\n";
-        print 'ip: ' . @{$self->{'config'}->{'_DATA'}->{"$param_name"}->{'ip'}}[0] . "\n";
-        print Dumper(\$self->{'error'});
+        # print Dumper(\$self->{'config'}->{'_DATA'});
+        # print Dumper(\$self->{'config'}->{'_DATA'}->{"$param_name"});
+        # print Dumper(\$self->{'error'});
         print "Site key is: $param_name.\n";
         print "Now exiting.\n";
         exit;
@@ -264,8 +267,8 @@ sub _analyze_test_logs {
         $test_string =~ s/_/ /g;
         if($_ =~ m/$test_string/){
           $critical_failures++;
-          $critical_failures{'failed_tests'}{'ip'}{"$ip[0]"}{'count'}++ if(ref($ip));
-          $critical_failures{'failed_tests'}{'ip'}{"$ip[0]"}{"$url"} = $_ if(ref($ip));
+          $critical_failures{'failed_tests'}{'ip'}{"$ip[0]"}{'count'}++ if(defined($ip[0]));
+          $critical_failures{'failed_tests'}{'ip'}{"$ip[0]"}{"$url"} = $_ if(defined($ip[0]));
           $critical_failures{'failed_tests'}{'url'}{"$url"}{"$test"} = $_;
           $critical_failures{'failed_tests'}{'test'}{"$test"}{"$url"} = $_;
         }
@@ -288,6 +291,7 @@ sub _return_result_log {
 
 sub email {
   my $self = shift;
+  my $critical_failures = shift;
   my ($type,@args,$body);
 
   my %headers = (
@@ -304,10 +308,12 @@ sub email {
     $body .= '    Tests: ' . $self->{'result'}->{'tests'};
     $body .= ', IPs: ' . $self->{'result'}->{'ips'};
     $body .= ', Sites: ' . $self->{'result'}->{'sites'};
-    $body .= ', CFs: ' . $self->{'result'}->{'critical_errors'};
+    $body .= ', CFs: ' . $critical_failures->{'count'};
+    # $body .= ', CFs: ' . $self->{'result'}->{'critical_failures'}->{'count'};
     $body .= "\n    ===================================\n\n";
     
     # $self->{'result'}->{'message'} = $body;
+  # print Dumper(\$self->{'result'});
 
   my $file = $self->{'config'}->param('global.result_log');
   if($self->{'config'}->param('global.send_summary') == 1){
@@ -323,9 +329,9 @@ sub email {
   if($self->{'config'}->param('global.send_diagnostics') == 1){
     $body .= <<'End_of_Separator';
 
-==============================================
-End of Summary, Beginning of Diagnostics
-==============================================
+     ==============================================
+     End of Summary, Beginning of Diagnostics
+     ==============================================
 
 End_of_Separator
 
@@ -357,6 +363,7 @@ sub sms {
          'Subject' => $self->{'config'}->param('global.MonitorSites_subject'),
        );
 
+  ### diag('report_by_ip is: ' . $self->{'config'}->param("global.report_by_ip"));
   my ($mailer,$type,@args,$body,$test,$url,$ip);
   my($failing_domains,$failing_domains_at_ip);
   if($critical_failures->{'count'} == 0){
@@ -377,24 +384,27 @@ sub sms {
     $self->_log_sms($body);
 
   } elsif(defined($self->{'config'}->param("global.report_by_ip")) 
-    && $self->{'config'}->param("global.report_by_ip") == 1){
+      && $self->{'config'}->param("global.report_by_ip") == 1) {
       foreach my $ip (keys %{$critical_failures{'failed_tests'}{'ip'}}){
-        $failing_domains = 0;
-        $failing_domains_at_ip = "";
-        foreach my $url (keys %{$critical_failures{'failed_tests'}{'ip'}{"$ip"}}){
-          if($url eq 'count'){ next; }
-          $failing_domains++;
-          $failing_domains_at_ip .= "NOK: $url, ";
+        if($critical_failures{'failed_tests'}{'ip'}{$ip}{'count'} != 0
+            || $self->{'config'}->param('global.report_success') == 1) {
+          $failing_domains = 0;
+          $failing_domains_at_ip = "";
+          foreach my $url (keys %{$critical_failures{'failed_tests'}{'ip'}{"$ip"}}){
+            if($url eq 'count'){ next; }
+            $failing_domains++;
+            $failing_domains_at_ip .= "NOK: $url, ";
+          }
+          $body = "$critical_failures{'failed_tests'}{'ip'}{$ip}{'count'}";
+          $body .= " critical errors at $ip; incl $failing_domains domains: ";
+          $body .= $failing_domains_at_ip;
+          # is(1,1,'About to send sms now about $url.');
+          $mailer = new Mail::Mailer $type, @args;
+          $mailer->open(\%headers);
+            print $mailer $body;
+          $mailer->close;
+          $self->_log_sms($body);
         }
-        $body = "$critical_failures{'failed_tests'}{'ip'}{$ip}{'count'}";
-        $body .= " critical errors at $ip; incl $failing_domains domains: ";
-        $body .= $failing_domains_at_ip;
-        # is(1,1,'About to send sms now about $url.');
-        $mailer = new Mail::Mailer $type, @args;
-        $mailer->open(\%headers);
-          print $mailer $body;
-        $mailer->close;
-        $self->_log_sms($body);
       }
   } else {
     my $i = 0;
@@ -476,7 +486,7 @@ Test::MonitorSites - Monitor availability and function of a list of websites
 
 =head1 VERSION
 
-This document describes Test::MonitorSites version 0.07
+This document describes Test::MonitorSites version 0.09
 
 =head1 SYNOPSIS
 

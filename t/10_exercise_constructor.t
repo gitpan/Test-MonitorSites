@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 use strict;
 use warnings;
-use Test::More tests => 37;
+use Test::More tests => 49;
 use Data::Dumper;
 use WWW::Mechanize;
 
@@ -42,6 +42,8 @@ END: {
 is($tester->{'config'}->{'_FILE_NAME'},$config_file,"The object includes the correct configuration filename.");
 like($tester->{'result_log'},qr/test_sites_output/,'It gives the configured result log file');
 
+is($tester->{'config'}->param('global.MonitorSites_email'),'MonitorSites_test_constructor@example.com','The constructor returned the From: address defined in config file.');
+
 my $agent = WWW::Mechanize->new();
 my (@url,@expected);
 foreach my $site (@{$tester->{'sites'}}){
@@ -81,5 +83,30 @@ is($tester->{'config'}->{'_FILE_NAME'},$config_file,"This object does include th
 unlike($tester->{'error'},qr/No configuration data is available./,'And the empty file error is not thrown.');
 like($tester->{'result_log'},qr/Test_MonitorSites_result.log/,'It gives us the default result log file');
 
-1;
+$tester = Test::MonitorSites->new( { 'config_file' => 't/testsuite_exercise_defaults.ini' } );
+isnt($tester->{'config'}->param('global.MonitorSites_email'),'',"This object does not include a blank From: address.");
+like($tester->{'error'},qr/Configuration fails to define global.MonitorSites_email for From: line./,'But an appropriate error is thrown saying the return email was left undefined in the configuration.');
+like($tester->{'config'}->param('global.MonitorSites_email'),qr/MonitorSites\@example.net/,' . . . and the default From: address is set in the constructor.');
 
+is($tester->{'result'}->{'ips'},0,'Count of IPs properly initiated.');
+is($tester->{'result'}->{'critical_errors'},0,'Count of critical errors properly initiated');
+is($tester->{'result'}->{'servers_with_failures'},0,'Count of servers with failures properly initiated.');
+is($tester->{'result'}->{'tests'},0,'Count of tests properly initiated.');
+is($tester->{'result'}->{'sites'},0,'Count of sites properly initiated.');
+
+is($tester->{'config'}->param('global.report_success'),0,"This object set global.report_success to false value by default.");
+is($tester->{'config'}->param('global.MonitorSites_subject'),'Critical Failures','->sms() subject line set to default');
+is($tester->{'config'}->param('global.MonitorSites_all_ok_subject'),'Servers All OK','->email() subjetc line set to default');
+
+TODO:
+{
+
+  local $TODO = "";
+
+  # $tester = Test::MonitorSites->new( { 'config_file' => undef } );
+  # isnt($tester->{'config'}->{'_FILE_NAME'},$config_file,"This object does not include the correct configuration filename.");
+  # like($tester->{'error'},qr/config_file was not set in the constructor/,'But an appropriate error was thrown for an undefined configuration file.');
+
+}
+
+1;

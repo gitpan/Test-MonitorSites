@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 use Test::Builder::Tester;
-use Test::More tests => 14;
+use Test::More tests => 19;
 use Data::Dumper;
 use WWW::Mechanize;
 
