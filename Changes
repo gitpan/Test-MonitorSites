@@ -1,5 +1,8 @@
 Revision history for Test-MonitorSites
 
+0.13   Mon Mar 26 14:12:30 2007
+       busted the test suite's ET phone home bug
+
 0.12   Mon Mar 26 10:51:06 2007
        added two missing t/*.ini files used by 
 	testsuite t/*.t scripts

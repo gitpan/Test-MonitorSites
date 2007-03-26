@@ -1,14 +1,30 @@
 use strict;
 use warnings;
 use ExtUtils::MakeMaker;
+use File::Util;
 
-# print "==>  These tests generate email output                            <==\n";
-# print "==>  Where would you like your test results sent?                 <==\n";
-# print "==>  By default test email summaries go to dev-null\@example.com  <==\n";
-# print "==>  By default test sms summaries go to dev-null\@example.com    <==\n";
+print "==>  These tests generate email output                            <==\n";
+print "==>  Where would you like your test results sent?                 <==\n";
+print "==>  By default test email summaries go to dev-null\@example.com  <==\n";
+print "==>  By default test sms summaries go to dev-null\@example.com    <==\n";
 
-# my $answer = prompt('Send test email summaries to?','devnull@example.com');
-# my $answer = prompt('Send test sms summaries to?','devnull@example.com');
+my $email = prompt('Send test email summaries to?','devnull@example.com');
+my $sms = prompt('Send test sms summaries to?','devnull@example.com');
+
+my($f) = File::Util->new();
+my @config_files = $f->list_dir( 't/ini' , '--pattern=\.ini$' );
+foreach my $config_file (@config_files){
+  print "writing t/$config_file \n";
+  open ('INI','>',"t/$config_file");
+  open ('SRC',"t/ini/$config_file");
+  while(<SRC>){
+    if(m/^sms_recipients =/){ $_ =~ s/$_/sms_recipients = '$sms'\n/; }
+    if(m/^results_recipients =/){ $_ =~ s/$_/results_recipients = '$email'\n/; }
+    print INI $_;
+  }
+  close SRC;
+  close INI;
+}
 
 WriteMakefile(
     NAME                => 'Test::MonitorSites',
@@ -19,6 +35,7 @@ WriteMakefile(
     PREREQ_PM => {
         'Cwd'                   => 0,
         'Carp'                  => 0,
+        'File::Util'            => 0,
         'Data::Dumper'          => 0,
         'Test::More'            => 0,
         'Test::Pod'             => 1.14,
@@ -33,7 +50,7 @@ WriteMakefile(
         'Test::Builder::Tester' => 0,
     },
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
-    clean               => { FILES => 'Test-MonitorSites-*' },
+    clean               => { FILES => 'Test-MonitorSites-* t/*.ini' },
 );
 
 
