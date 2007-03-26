@@ -17,10 +17,12 @@ t/perlcritic.t
 t/pod-coverage.t
 t/pod.t
 t/testsuite_monitor_quietly.ini
+t/testsuite_exercise_defaults.ini
 t/testsuite_all_ok.ini
 t/emailtest.ini
 t/empty_test_suite.ini
 t/incomplete_test_suite.ini
+t/testsuite_rpt_by_ip.ini
 t/testsuite_report_by_ip.ini
 t/testsuite_addtl.ini
 t/testsuite.ini

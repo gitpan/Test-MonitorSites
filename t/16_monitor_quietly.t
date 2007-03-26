@@ -39,6 +39,7 @@ is($tester->{'config'}->param('global.report_by_ip'),1,'The constructor set repo
 like($tester->{'error'},qr/neither send_summary nor send_diagnostics were set to true/,'No email summary was sent.');
 
 
+$tester = Test::MonitorSites->new( { 'config_file' => $config_file } );
 $tester->{'error'} = '';
 $tester->{'config'}->param('global.send_summary',1);
 test_out("ok 1","ok 2"); 
@@ -54,7 +55,8 @@ is($tester->{'config'}->param('global.report_by_ip'),1,'The constructor set repo
 
 unlike($tester->{'error'},qr/neither send_summary nor send_diagnostics were set to true/,'An email summary should have been sent.');
 
-
+ 
+$tester = Test::MonitorSites->new( { 'config_file' => $config_file } );
 $tester->{'error'} = '';
 $tester->{'config'}->param('global.send_summary',0);
 $tester->{'config'}->param('global.send_diagnostics',1);

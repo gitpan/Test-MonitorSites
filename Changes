@@ -1,5 +1,9 @@
 Revision history for Test-MonitorSites
 
+0.12   Mon Mar 26 10:51:06 2007
+       added two missing t/*.ini files used by 
+	testsuite t/*.t scripts
+
 0.11   Sun Mar 25 16:43:40 2007
        added missing test scripts to MANIFEST
 
