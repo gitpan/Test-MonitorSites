@@ -1,5 +1,8 @@
 Revision history for Test-MonitorSites
 
+0.11   Sun Mar 25 16:43:40 2007
+       added missing test scripts to MANIFEST
+
 0.10   Sun Mar 25 13:32:07 2007
        adds t/16_monitor_quietly.t, exercising 
 	new conditionals around use of ->email()

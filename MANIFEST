@@ -11,9 +11,13 @@ t/12_exercise_test_sites_method.t
 t/13_exercise_mail_functions.pl
 t/14_cover_conditions.t
 t/15_test_rpt_by_ip.pl
+t/15_report_by_ip.t
+t/16_monitor_quietly.t
 t/perlcritic.t
 t/pod-coverage.t
 t/pod.t
+t/testsuite_monitor_quietly.ini
+t/testsuite_all_ok.ini
 t/emailtest.ini
 t/empty_test_suite.ini
 t/incomplete_test_suite.ini
