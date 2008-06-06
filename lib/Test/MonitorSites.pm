@@ -16,7 +16,7 @@ use Mail::Mailer;
 # use Mail::Mailer qw(mail);
 
 use vars qw($VERSION);
-$VERSION = '0.13';
+$VERSION = '0.14';
 
 1; # Magic true value required at end of module
 
@@ -492,7 +492,7 @@ Test::MonitorSites - Monitor availability and function of a list of websites
 
 =head1 VERSION
 
-This document describes Test::MonitorSites version 0.13
+This document describes Test::MonitorSites version 0.14
 
 =head1 SYNOPSIS
 
