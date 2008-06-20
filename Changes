@@ -1,5 +1,11 @@
 Revision history for Test-MonitorSites
 
+0.15   Fri Jun 20 06:52:38 EDT 2008
+       removed dependency on File::Util, 
+       now use glob (built-in) in Makefile.PL, 
+       instead.  Smoke Testers reported frequent 
+       install failures due to missing module.
+
 0.14   Fri Jun 6 13:03:11 EDT 2008
        busting bug in Makefile which fails on File/Util 
        requirement before WriteMakefile() loads 

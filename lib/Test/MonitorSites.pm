@@ -16,7 +16,7 @@ use Mail::Mailer;
 # use Mail::Mailer qw(mail);
 
 use vars qw($VERSION);
-$VERSION = '0.14';
+$VERSION = '0.15';
 
 1; # Magic true value required at end of module
 

@@ -19,7 +19,6 @@ WriteMakefile(
     PREREQ_PM => {
         'Cwd'                   => 0,
         'Carp'                  => 0,
-        'File::Util'            => 0,
         'HTML::Tidy'            => 0,
         'Data::Dumper'          => 0,
         'Test::More'            => 0,
@@ -39,10 +38,9 @@ WriteMakefile(
     clean               => { FILES => 'Test-MonitorSites-* t/*.ini' },
 );
 
-require File::Util;
-my($f) = File::Util->new();
-my @config_files = $f->list_dir( 't/ini' , '--pattern=\.ini$' );
+my @config_files = glob("t/ini/*.ini");
 foreach my $config_file (@config_files){
+  $config_file =~ s/t\/ini\///;
   print "writing t/$config_file \n";
   open ('INI','>',"t/$config_file");
   open ('SRC',"t/ini/$config_file");

@@ -1,4 +1,4 @@
-Test-MonitorSites version 0.04
+Test-MonitorSites version 0.15
 
 This module is intended to facilitate the monitoring of a
 collection of web sites for availability and eventually for
@@ -27,8 +27,6 @@ following commands:
     ./Build test
     ./Build install
 
-
-
 DEPENDENCIES
 
 The prerequisites are defined in the Makefile.PL and Build.PL
@@ -39,7 +37,11 @@ in its constructor.
 
 COPYRIGHT AND LICENCE
 
-Copyright (C) 2007, Hugh Esco
+Copyright (C) 2007-2008, Hugh Esco
+
+With appreciation to the Green Party of Canada, which funded
+initial development.
 
 This library is free software; you can redistribute it and/or
 modify it under the terms of the Gnu Public License.
+

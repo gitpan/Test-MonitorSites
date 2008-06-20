@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:                Test-MonitorSites
-version:             0.14
+version:             0.15
 abstract:            Monitor availability and function of a list of websites 
 license:             ~
 generated_by:        ExtUtils::MakeMaker version 6.36
@@ -10,7 +10,6 @@ requires:
     Config::Simple:                0
     Cwd:                           0
     Data::Dumper:                  0
-    File::Util:                    0
     HTML::Tidy:                    0
     HTTP::Request::Common:         0
     Mail::Mailer:                  0
